@@ -82,7 +82,7 @@ def render_todo_list():
 
 
 # def delete_all_entries():
-#     with sqlite3.connect(DB_NAME) as conn:
+#     with sqlite3.connect(todo_db) as conn:
 #         cursor = conn.cursor()
 #         cursor.execute("DELETE FROM todos")
 #         conn.commit()
