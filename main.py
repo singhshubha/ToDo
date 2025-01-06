@@ -6,10 +6,10 @@ import sqlite3
 app, rt = fast_app()
 
 # Database setup
-DB_NAME = "todo.db"
+todo_db = "todo.db"
 
 def execute_query(query, params=(), fetch=False):
-    with sqlite3.connect(DB_NAME) as conn:
+    with sqlite3.connect(todo_db) as conn:
         cursor = conn.cursor()
         cursor.execute(query, params)
         if fetch:
