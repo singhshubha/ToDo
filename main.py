@@ -80,4 +80,16 @@ def render_todo_list():
         for title, body, creation_time, due_date, is_completed, tags in items
     ]
 
+
+# def delete_all_entries():
+#     with sqlite3.connect(DB_NAME) as conn:
+#         cursor = conn.cursor()
+#         cursor.execute("DELETE FROM todos")
+#         conn.commit()
+#         print("All entries have been deleted.")
+
+# # Call the function to delete all entries
+# delete_all_entries()
+
+
 serve()
