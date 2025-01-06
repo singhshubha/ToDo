@@ -2,13 +2,17 @@ from fasthtml.common import *
 from datetime import datetime
 import sqlite3
 
+
+
 # Initialize the app
 app, rt = fast_app()
 
 # Database setup
 todo_db = "todo.db"
 
+
 def execute_query(query, params=(), fetch=False):
+    """Execute a query on the SQLite database."""
     with sqlite3.connect(todo_db) as conn:
         cursor = conn.cursor()
         cursor.execute(query, params)
@@ -16,7 +20,9 @@ def execute_query(query, params=(), fetch=False):
             return cursor.fetchall()
         conn.commit()
 
-# Create the todos table with the required fields
+
+
+# Create the todos table
 execute_query(
     """
     CREATE TABLE IF NOT EXISTS todos (
@@ -31,25 +37,73 @@ execute_query(
     """
 )
 
+
+
+def render_todo_list():
+    """Fetch and render all tasks."""
+    items = execute_query(
+        """
+        SELECT id, title, body, creation_time, due_date, is_completed, tags
+        FROM todos
+        ORDER BY id DESC
+        """,
+        fetch=True,
+    )
+    if not items:
+        return [Li("No tasks remaining.")]
+    rendered_items = [
+        Li(
+            f"Task ID: {item[0]} | Title: {item[1]} | Body: {item[2] or 'N/A'} | Created: {item[3]} | "
+            f"Due: {item[4] or 'N/A'} | Completed: {'✔️' if item[5] else '❌'} | Tags: {item[6] or 'None'}",
+            Div(
+                A(
+                    "Done",
+                    href="#",
+                    hx_post=f"/done/{item[0]}",
+                    hx_target="#todo-list",
+                    hx_swap="innerHTML"
+                ),
+                A(
+                    "Delete",
+                    href="#",
+                    hx_post=f"/delete/{item[0]}",
+                    hx_target="#todo-list",
+                    hx_swap="innerHTML"
+                ),
+            ),
+            id=f"task-{item[0]}",
+        )
+        for item in items
+    ]
+    return rendered_items
+
+
+
+
+
 @rt("/")
 def get():
-    # Render the to-do list and input form
+    """Render the to-do list and input form."""
     return Titled(
         "To-Do Lists",
         Form(
-            Input(name="title", placeholder="Title"),
-            Input(name="body", placeholder="Body (OPTIONAL)"),
-            Input(name="due_date", placeholder="Due Date)", type="date"),
-            Input(name="tags", placeholder="Tags separated by comma"),
+            Input(name="title", placeholder="Title", required=True),
+            Textarea(name="body", placeholder="Body (optional)"),
+            Input(name="due_date", placeholder="Due Date (YYYY-MM-DD)", type="date"),
+            Input(name="tags", placeholder="Tags (comma-separated)"),
             Button("Add", type="submit"),
-            hx_post="/add", hx_target="#todo-list", hx_swap="beforeend",
+            hx_post="/add", hx_target="#todo-list", hx_swap="innerHTML",
         ),
         Ul(id="todo-list", children=render_todo_list()),
     )
 
+
+
+
+
 @rt("/add", methods=["POST"])
 def add(title: str, body: str = "", due_date: str = None, tags: str = ""):
-    # Add a new task to the database
+    """Add a new task to the database and update the list."""
     execute_query(
         """
         INSERT INTO todos (title, body, creation_time, due_date, tags)
@@ -59,26 +113,36 @@ def add(title: str, body: str = "", due_date: str = None, tags: str = ""):
     )
     return Ul(*render_todo_list(), id="todo-list")
 
-def render_todo_list():
-    # Fetch and render tasks
-    items = execute_query(
-        """
-        SELECT title, body, creation_time, due_date, is_completed, tags
-        FROM todos
-        ORDER BY id DESC
-        """,
+
+
+
+@rt("/delete/<int:task_id>", methods=["POST"])
+def delete_task(task_id: int):
+    """Delete the task from the database and refresh the list."""
+    execute_query("DELETE FROM todos WHERE id = ?", (task_id,))
+    updated_list = render_todo_list()
+    return Ul(*updated_list, id="todo-list")
+
+
+
+
+
+
+@rt("/done/<int:task_id>", methods=["POST"])
+def toggle_completed(task_id: int):
+    """Toggle the is_completed status in the database and refresh the list."""
+    current_status = execute_query(
+        "SELECT is_completed FROM todos WHERE id = ?",
+        (task_id,),
         fetch=True,
     )
-    if not items:
-        return [Li("No to-do items yet!")]
-    return [
-        Li(
-            f"Title: {title} | Body: {body or 'N/A'} | Created: {creation_time} | "
-            f"Due: {due_date or 'N/A'} | Completed: {'Yes' if is_completed else 'No'} | "
-            f"Tags: {tags or 'None'}"
-        )
-        for title, body, creation_time, due_date, is_completed, tags in items
-    ]
+    new_status = 0 if current_status else 1
+    execute_query(
+        "UPDATE todos SET is_completed = ? WHERE id = ?",
+        (new_status, task_id),
+    )
+    updated_list = render_todo_list()
+    return Ul(*updated_list, id="todo-list")
 
 
 # def delete_all_entries():
